@@ -15,10 +15,10 @@ const EnergiaPanel: React.FC = () => {
 
   const fetchData = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('view_simulacao_reforma')
+    const { data } = await supabase
+      .from('view_analise_energia')
       .select('*')
-      .eq('reg', activeTab)
+      .eq('tipo_reg', activeTab)
       .eq('ano_simulacao', selectedYear)
       .order('dt_doc', { ascending: false });
 
@@ -32,63 +32,50 @@ const EnergiaPanel: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-white">Água e Energia (C500/C600)</h2>
-          <p className="text-[#92adc9] text-sm">Cálculos baseados em utilidades sincronizadas via Supabase.</p>
+          <h2 className="text-2xl font-bold text-white">Água e Energia</h2>
+          <p className="text-[#92adc9] text-sm">Visualização via ViewAnaliseEnergia SQL.</p>
         </div>
         <select 
           value={selectedYear} 
           onChange={e => setSelectedYear(Number(e.target.value))}
-          className="bg-[#192633] border border-[#324d67] text-white px-4 py-2 rounded-lg outline-none font-bold text-sm cursor-pointer"
+          className="bg-[#192633] border border-[#324d67] text-white px-4 py-2 rounded-xl text-sm font-bold"
         >
-          {TRANSITION_ALIQUOTS.map(a => <option key={a.ano} value={a.ano}>Transição {a.ano}</option>)}
+          {TRANSITION_ALIQUOTS.map(a => <option key={a.ano} value={a.ano}>Ano {a.ano}</option>)}
         </select>
       </div>
 
-      <div className="flex border-b border-[#233648]">
-        <button onClick={() => setActiveTab('C500')} className={`px-6 py-3 text-sm font-bold transition-colors ${activeTab === 'C500' ? 'text-primary border-b-2 border-primary' : 'text-[#92adc9] hover:text-white'}`}>Créditos (C500)</button>
-        <button onClick={() => setActiveTab('C600')} className={`px-6 py-3 text-sm font-bold transition-colors ${activeTab === 'C600' ? 'text-primary border-b-2 border-primary' : 'text-[#92adc9] hover:text-white'}`}>Débitos (C600)</button>
-      </div>
+      <div className="bg-[#15202b] rounded-2xl border border-[#233648] overflow-hidden">
+        <div className="flex border-b border-[#233648]">
+          <button onClick={() => setActiveTab('C500')} className={`px-8 py-4 text-xs font-bold transition-all ${activeTab === 'C500' ? 'text-primary border-b-2 border-primary' : 'text-[#567089]'}`}>Créditos (C500)</button>
+          <button onClick={() => setActiveTab('C600')} className={`px-8 py-4 text-xs font-bold transition-all ${activeTab === 'C600' ? 'text-primary border-b-2 border-primary' : 'text-[#567089]'}`}>Débitos (C600)</button>
+        </div>
 
-      <div className="bg-[#15202b] rounded-xl border border-[#233648] overflow-hidden min-h-[400px]">
-        {isLoading ? (
-          <div className="h-[400px] flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
-              <thead className="bg-[#192633] text-[#92adc9] text-[10px] uppercase font-bold tracking-widest border-b border-[#233648]">
-                <tr>
-                  <th className="px-4 py-4">Filial / UF</th>
-                  <th className="px-4 py-4">Data Doc.</th>
-                  <th className="px-4 py-4 text-right">VL DOC</th>
-                  <th className="px-4 py-4 text-right text-yellow-500">ICMS Proj.</th>
-                  <th className="px-4 py-4 text-right text-indigo-400">IBS Proj.</th>
-                  <th className="px-4 py-4 text-right text-emerald-400">CBS Proj.</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-[#192633] text-[#567089] text-[10px] uppercase font-bold tracking-widest">
+              <tr>
+                <th className="px-6 py-4">Data Doc.</th>
+                <th className="px-6 py-4 text-right">VL DOC</th>
+                <th className="px-6 py-4 text-right text-indigo-400">IBS</th>
+                <th className="px-6 py-4 text-right text-emerald-400">CBS</th>
+                <th className="px-6 py-4 text-right text-yellow-500">ICMS Proj.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#233648]">
+              {isLoading ? (
+                <tr><td colSpan={5} className="py-10 text-center text-[#567089] text-sm animate-pulse">Carregando Views Analíticas...</td></tr>
+              ) : records.map((rec, i) => (
+                <tr key={i} className="hover:bg-[#1c2a38] transition-colors">
+                  <td className="px-6 py-4 text-xs text-white">{new Date(rec.dt_doc).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-sm text-right font-mono text-white">{formatCurrency(rec.vl_doc)}</td>
+                  <td className="px-6 py-4 text-sm text-right font-mono font-bold text-indigo-400">{formatCurrency(rec.ibs_projetado)}</td>
+                  <td className="px-6 py-4 text-sm text-right font-mono font-bold text-emerald-400">{formatCurrency(rec.cbs_projetado)}</td>
+                  <td className="px-6 py-4 text-sm text-right font-mono font-bold text-yellow-500">{formatCurrency(rec.icms_projetado)}</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-[#233648]">
-                {records.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-[#567089]">Nenhum registro de utilidade encontrado.</td></tr>
-                ) : (
-                  records.map((rec) => (
-                    <tr key={rec.id} className="hover:bg-[#1c2a38]">
-                      <td className="px-4 py-4">
-                        <p className="text-white text-xs font-bold">{rec.cnpj_filial}</p>
-                        <p className="text-[#92adc9] text-[10px] uppercase">{rec.uf_filial}</p>
-                      </td>
-                      <td className="px-4 py-4 text-xs text-white">{new Date(rec.dt_doc).toLocaleDateString()}</td>
-                      <td className="px-4 py-4 text-sm text-right font-mono text-white">{formatCurrency(rec.vl_doc)}</td>
-                      <td className="px-4 py-4 text-sm text-right font-mono font-bold text-yellow-500">{formatCurrency(rec.vl_icms_projetado)}</td>
-                      <td className="px-4 py-4 text-sm text-right font-mono font-bold text-indigo-400">{formatCurrency(rec.vl_ibs_projetado)}</td>
-                      <td className="px-4 py-4 text-sm text-right font-mono font-bold text-emerald-400">{formatCurrency(rec.vl_cbs_projetado)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

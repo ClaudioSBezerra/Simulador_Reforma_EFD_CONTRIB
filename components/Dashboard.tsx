@@ -18,17 +18,18 @@ const Dashboard: React.FC = () => {
   }, []);
 
   const fetchStats = async () => {
-    const { data, error } = await supabase
-      .from('view_simulacao_reforma')
-      .select('vl_doc, vl_piscofins_atual, vl_ibs_projetado, vl_cbs_projetado')
-      .eq('ano_simulacao', 2027); // Estatísticas base para o ano inicial de transição
+    // Usamos a view de mercadorias como proxy para estatísticas gerais
+    const { data } = await supabase
+      .from('view_analise_mercadorias')
+      .select('vl_doc, pis_cofins_atual, ibs_projetado, cbs_projetado')
+      .eq('ano_simulacao', 2027); 
 
     if (data && data.length > 0) {
       const totals = data.reduce((acc: any, curr: any) => ({
-        vl_doc: acc.vl_doc + curr.vl_doc,
-        vl_piscofins_atual: acc.vl_piscofins_atual + curr.vl_piscofins_atual,
-        vl_ibs_projetado: acc.vl_ibs_projetado + curr.vl_ibs_projetado,
-        vl_cbs_projetado: acc.vl_cbs_projetado + curr.vl_cbs_projetado,
+        vl_doc: acc.vl_doc + (curr.vl_doc || 0),
+        vl_piscofins_atual: acc.vl_piscofins_atual + (curr.pis_cofins_atual || 0),
+        vl_ibs_projetado: acc.vl_ibs_projetado + (curr.ibs_projetado || 0),
+        vl_cbs_projetado: acc.vl_cbs_projetado + (curr.cbs_projetado || 0),
       }), { vl_doc: 0, vl_piscofins_atual: 0, vl_ibs_projetado: 0, vl_cbs_projetado: 0 });
 
       setStats({ ...totals, records: data.length });
@@ -43,8 +44,6 @@ const Dashboard: React.FC = () => {
   }));
 
   const formatCurrency = (v: number) => {
-    if (v >= 1000000) return `R$ ${(v / 1000000).toFixed(2)}M`;
-    if (v >= 1000) return `R$ ${(v / 1000).toFixed(1)}k`;
     return v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
@@ -52,51 +51,45 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h2 className="text-2xl font-bold text-white">Consolidado do Grupo</h2>
-          <p className="text-[#92adc9] text-sm">Visão geral dos impactos financeiros baseada em {stats.records} registros.</p>
+          <h2 className="text-2xl font-bold text-white">Consolidado Tributário</h2>
+          <p className="text-[#92adc9] text-sm">Base de dados relacional sincronizada via Supabase Views.</p>
         </div>
-        <div className="flex gap-2">
-            <button className="bg-[#233648] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#324d67] transition-colors">Exportar</button>
-            <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors" onClick={fetchStats}>Atualizar</button>
-        </div>
+        <button className="bg-primary text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-primary/90 transition-all" onClick={fetchStats}>
+          Atualizar Métricas
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Faturamento Base', value: formatCurrency(stats.vl_doc), delta: 'Total SPED', up: true },
-          { label: 'PIS/COFINS Atual', value: formatCurrency(stats.vl_piscofins_atual), delta: 'Carga Histórica', up: false },
-          { label: 'IBS + CBS (2027)', value: formatCurrency(stats.vl_ibs_projetado + stats.vl_cbs_projetado), delta: 'Projeção Inicial', up: true },
-          { label: 'Diferença Carga', value: formatCurrency((stats.vl_ibs_projetado + stats.vl_cbs_projetado) - stats.vl_piscofins_atual), delta: 'Impacto Estimado', up: (stats.vl_ibs_projetado + stats.vl_cbs_projetado) > stats.vl_piscofins_atual },
+          { label: 'Faturamento Base', value: formatCurrency(stats.vl_doc), delta: 'Total SPED', color: 'text-white' },
+          { label: 'PIS/COFINS Hist.', value: formatCurrency(stats.vl_piscofins_atual), delta: 'Carga Atual', color: 'text-[#92adc9]' },
+          { label: 'IBS + CBS (2027)', value: formatCurrency(stats.vl_ibs_projetado + stats.vl_cbs_projetado), delta: 'Projeção', color: 'text-primary' },
+          { label: 'Impacto Estimado', value: formatCurrency((stats.vl_ibs_projetado + stats.vl_cbs_projetado) - stats.vl_piscofins_atual), delta: 'Diferença', color: 'text-yellow-500' },
         ].map((card, idx) => (
-          <div key={idx} className="bg-[#15202b] p-5 rounded-xl border border-[#233648] shadow-sm">
-            <p className="text-[#92adc9] text-[10px] font-bold uppercase tracking-widest mb-2">{card.label}</p>
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-xl font-bold text-white">{card.value}</h3>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${card.up ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                {card.delta}
-              </span>
-            </div>
+          <div key={idx} className="bg-[#15202b] p-5 rounded-2xl border border-[#233648] shadow-sm">
+            <p className="text-[#567089] text-[10px] font-bold uppercase tracking-widest mb-3">{card.label}</p>
+            <h3 className={`text-xl font-bold ${card.color}`}>{card.value}</h3>
+            <p className="text-[#567089] text-[10px] mt-1 font-medium">{card.delta}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-[#15202b] p-6 rounded-xl border border-[#233648] shadow-lg">
-        <h3 className="text-lg font-bold text-white mb-6">Curva de Transição das Alíquotas</h3>
-        <div className="h-[400px]">
+      <div className="bg-[#15202b] p-8 rounded-2xl border border-[#233648] shadow-xl">
+        <h3 className="text-lg font-bold text-white mb-8">Transição das Alíquotas (2027-2033)</h3>
+        <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dataChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#233648" vertical={false} />
-              <XAxis dataKey="name" stroke="#92adc9" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="#92adc9" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+              <XAxis dataKey="name" stroke="#567089" fontSize={12} axisLine={false} tickLine={false} />
+              <YAxis stroke="#567089" fontSize={12} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
               <Tooltip 
-                contentStyle={{ backgroundColor: '#192633', border: '1px solid #324d67', borderRadius: '8px' }} 
-                itemStyle={{ color: '#fff', fontSize: '12px' }}
+                contentStyle={{ backgroundColor: '#192633', border: '1px solid #324d67', borderRadius: '12px' }} 
                 cursor={{ fill: '#233648', opacity: 0.4 }}
               />
-              <Legend verticalAlign="top" align="right" wrapperStyle={{ paddingBottom: '20px' }} />
-              <Bar dataKey="atual" name="PIS/COF (Referência)" fill="#324d67" radius={[4, 4, 0, 0]} barSize={40} />
-              <Bar dataKey="cbs" name="CBS (%)" fill="#137fec" radius={[4, 4, 0, 0]} barSize={40} />
-              <Bar dataKey="ibs" name="IBS (%)" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={40} />
+              <Legend verticalAlign="top" align="right" />
+              <Bar dataKey="atual" name="PIS/COF Ref." fill="#233648" radius={[4, 4, 0, 0]} barSize={35} />
+              <Bar dataKey="cbs" name="CBS" fill="#137fec" radius={[4, 4, 0, 0]} barSize={35} />
+              <Bar dataKey="ibs" name="IBS" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={35} />
             </BarChart>
           </ResponsiveContainer>
         </div>

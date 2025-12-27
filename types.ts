@@ -1,5 +1,4 @@
 
-
 export enum ViewType {
   LOGIN = 'login',
   DASHBOARD = 'dashboard',
@@ -9,10 +8,9 @@ export enum ViewType {
   IMPORTE = 'importe'
 }
 
-// Added avatar_url property to User interface to fix TypeScript error in Sidebar.tsx
 export interface User {
   id: string;
-  nome: string;
+  nome?: string;
   email: string;
   role: 'master' | 'empresa';
   tenant_id?: string;
