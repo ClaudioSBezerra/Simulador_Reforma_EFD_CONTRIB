@@ -1,19 +1,20 @@
 
 import React from 'react';
-import { ViewType } from '../types';
+import { ViewType, User } from '../types';
 
 interface SidebarProps {
   activeView: ViewType;
   onViewChange: (view: ViewType) => void;
+  user: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, user }) => {
   const menuItems = [
     { id: ViewType.DASHBOARD, label: 'Dashboard', icon: 'dashboard' },
+    { id: ViewType.IMPORTE, label: 'Importar SPED', icon: 'upload_file' },
     { id: ViewType.MERCADORIAS, label: 'Mercadorias (C100)', icon: 'inventory_2' },
     { id: ViewType.ENERGIA, label: 'Água e Energia', icon: 'bolt' },
     { id: ViewType.FRETE, label: 'Frete e Transporte', icon: 'local_shipping' },
-    { id: ViewType.IMPORTE, label: 'Importar SPED', icon: 'upload_file' },
   ];
 
   return (
@@ -49,10 +50,16 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange }) => {
 
       <div className="p-4 border-t border-[#233648]">
         <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-[#192633]">
-          <div className="size-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-xs font-bold text-white">JS</div>
+          <div className={`size-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+            user?.role === 'master' ? 'bg-indigo-600' : 'bg-emerald-600'
+          }`}>
+            {user?.avatar_url || 'U'}
+          </div>
           <div className="min-w-0">
-            <p className="text-white text-xs font-bold truncate">João Silva</p>
-            <p className="text-[#92adc9] text-[10px] truncate">Master Admin</p>
+            <p className="text-white text-xs font-bold truncate">{user?.nome || 'Usuário'}</p>
+            <p className="text-[#92adc9] text-[10px] truncate uppercase font-bold tracking-tighter">
+              {user?.role === 'master' ? 'Master Admin' : 'Empresa/Filial'}
+            </p>
           </div>
         </div>
       </div>

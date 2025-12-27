@@ -1,10 +1,20 @@
 
 export enum ViewType {
+  LOGIN = 'login',
   DASHBOARD = 'dashboard',
   MERCADORIAS = 'mercadorias',
   ENERGIA = 'energia',
   FRETE = 'frete',
   IMPORTE = 'importe'
+}
+
+export interface User {
+  id: string;
+  nome: string;
+  email: string;
+  role: 'master' | 'empresa';
+  tenant_id: string;
+  avatar_url?: string;
 }
 
 export interface Aliquota {
@@ -36,8 +46,8 @@ export interface Filial {
 
 export interface SpedRecord {
   id: string;
-  ind_oper?: '0' | '1'; // 0: Entrada, 1: Saída
-  tipo_reg?: 'C500' | 'C600'; // Específico para Energia/Água
+  ind_oper?: '0' | '1';
+  tipo_reg?: 'C500' | 'C600';
   dt_doc: string;
   vl_doc: number;
   vl_bc_icms: number;
@@ -45,6 +55,6 @@ export interface SpedRecord {
   vl_pis: number;
   vl_cofins: number;
   num_doc?: string;
-  cnpj_c010?: string; // CNPJ da filial/estabelecimento
-  mes_ano?: string; // MMYYYY
+  cnpj_c010?: string;
+  mes_ano?: string;
 }
