@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { parseSpedLine, parseBrazilianNumber } from '../services/spedService';
+import { parseSpedLine, mapC100, mapC500, mapC600, mapD100 } from '../services/spedService';
+import { supabase } from '../services/supabase';
 
 const SpedImporter: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
@@ -18,24 +18,61 @@ const SpedImporter: React.FC = () => {
     reader.onload = async (e) => {
       const text = e.target?.result as string;
       const lines = text.split('\n');
-      let cnpj = '';
-      let recordCount = 0;
+      let cnpjMain = '';
+      const recordsToInsert: any[] = [];
 
-      for (let i = 0; i < lines.length; i++) {
-        const fields = parseSpedLine(lines[i]);
+      // 1. Identificar CNPJ (Registro 0000)
+      for (const line of lines) {
+        const fields = parseSpedLine(line);
         if (fields[1] === '0000') {
-          cnpj = fields[7];
-        }
-        if (fields[1] === 'C100' || fields[1] === 'C500' || fields[1] === 'D100') {
-          recordCount++;
-        }
-
-        if (i % 100 === 0) {
-          setProgress(Math.round((i / lines.length) * 100));
+          cnpjMain = fields[7];
+          break;
         }
       }
 
-      setSummary({ cnpj, records: recordCount });
+      // 2. Buscar Filial_ID no Supabase
+      const { data: filial } = await supabase
+        .from('filiais')
+        .select('id, tenant_id')
+        .eq('cnpj', cnpjMain)
+        .single();
+
+      if (!filial) {
+        alert('Empresa com CNPJ ' + cnpjMain + ' não encontrada no cadastro do sistema.');
+        setIsUploading(false);
+        return;
+      }
+
+      // 3. Processar Registros
+      for (let i = 0; i < lines.length; i++) {
+        const fields = parseSpedLine(lines[i]);
+        const reg = fields[1];
+        let mapped = null;
+
+        if (reg === 'C100') mapped = { ...mapC100(fields), reg: 'C100' };
+        else if (reg === 'C500') mapped = { ...mapC500(fields), reg: 'C500' };
+        else if (reg === 'C600') mapped = { ...mapC600(fields), reg: 'C600' };
+        else if (reg === 'D100') mapped = { ...mapD100(fields), reg: 'D100' };
+
+        if (mapped && mapped.dt_doc) {
+          recordsToInsert.push({
+            ...mapped,
+            filial_id: filial.id,
+            tenant_id: filial.tenant_id,
+            mes_ano: mapped.dt_doc.substring(5, 7) + '/' + mapped.dt_doc.substring(0, 4)
+          });
+        }
+
+        if (i % 500 === 0) setProgress(Math.round((i / lines.length) * 100));
+      }
+
+      // 4. Salvar no Supabase (Batch insert)
+      if (recordsToInsert.length > 0) {
+        const { error } = await supabase.from('sped_registros').insert(recordsToInsert);
+        if (error) console.error('Erro ao salvar no banco:', error);
+      }
+
+      setSummary({ cnpj: cnpjMain, records: recordsToInsert.length });
       setIsUploading(false);
       setProgress(100);
     };
@@ -46,59 +83,42 @@ const SpedImporter: React.FC = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex flex-col gap-2">
-        <h2 className="text-3xl font-bold text-white">Importação de Arquivos SPED</h2>
-        <p className="text-[#92adc9] text-base">Gerencie o envio de arquivos fiscais para processamento e simulação da Reforma.</p>
+        <h2 className="text-3xl font-bold text-white">Importação SPED Cloud</h2>
+        <p className="text-[#92adc9] text-base">Os dados serão processados e armazenados no Supabase para análise histórica.</p>
       </div>
 
       <div className="flex flex-col items-center gap-6 rounded-xl border-2 border-dashed border-[#324d67] bg-[#1a2632]/50 hover:bg-[#1a2632] hover:border-primary/50 transition-all px-6 py-14 group cursor-pointer relative">
-        <input 
-            type="file" 
-            accept=".txt" 
-            onChange={handleFileChange}
-            className="absolute inset-0 opacity-0 cursor-pointer" 
-        />
+        <input type="file" accept=".txt" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" />
         <div className="p-4 rounded-full bg-[#233648] group-hover:bg-[#233648]/80 transition-colors">
-          <span className="material-symbols-outlined text-white text-[48px]">cloud_upload</span>
+          <span className="material-symbols-outlined text-white text-[48px]">database</span>
         </div>
-        <div className="flex max-w-[480px] flex-col items-center gap-2">
-          <p className="text-white text-lg font-bold leading-tight text-center">Arraste e solte seu arquivo SPED aqui</p>
-          <p className="text-[#92adc9] text-sm font-normal text-center">Suporta arquivos .txt do SPED Fiscal e Contribuições (Máx 50MB)</p>
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-white text-lg font-bold">Enviar EFD Contribuições</p>
+          <p className="text-[#92adc9] text-sm text-center">Os registros C100, C500 e D100 serão extraídos automaticamente.</p>
         </div>
-        <button className="flex min-w-[84px] items-center justify-center rounded-lg h-10 px-6 bg-primary hover:bg-primary/90 transition-colors text-white text-sm font-bold">
-          Selecionar do Computador
-        </button>
       </div>
 
       {isUploading && (
         <div className="flex flex-col gap-3 p-5 rounded-xl bg-[#1a2632] border border-[#233648]">
           <div className="flex justify-between items-center mb-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary/20 rounded-lg text-primary">
-                <span className="material-symbols-outlined">description</span>
-              </div>
-              <div className="flex flex-col">
-                <p className="text-white text-sm font-medium">Processando arquivo...</p>
-                <p className="text-[#92adc9] text-xs">Aguarde a leitura dos registros</p>
-              </div>
-            </div>
-            <p className="text-white text-sm font-bold">{progress}%</p>
+            <span className="text-white text-sm font-medium">Sincronizando com Supabase...</span>
+            <span className="text-white text-sm font-bold">{progress}%</span>
           </div>
           <div className="w-full bg-[#324d67] rounded-full h-2 overflow-hidden">
-            <div 
-              className="bg-primary h-full transition-all duration-300" 
-              style={{ width: `${progress}%` }}
-            ></div>
+            <div className="bg-primary h-full transition-all" style={{ width: `${progress}%` }}></div>
           </div>
         </div>
       )}
 
       {summary && !isUploading && (
-        <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20">
-          <h4 className="text-green-500 font-bold mb-2">Importação Concluída com Sucesso</h4>
-          <p className="text-[#92adc9] text-sm">
-            CNPJ Identificado: <span className="text-white font-mono">{summary.cnpj}</span><br />
-            Total de Documentos Processados: <span className="text-white font-mono">{summary.records}</span>
-          </p>
+        <div className="p-6 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center gap-4">
+          <span className="material-symbols-outlined text-green-500 text-3xl">check_circle</span>
+          <div>
+            <h4 className="text-green-500 font-bold">Base de Dados Atualizada</h4>
+            <p className="text-[#92adc9] text-xs">
+              CNPJ: {summary.cnpj} | {summary.records} novos registros persistidos.
+            </p>
+          </div>
         </div>
       )}
     </div>
