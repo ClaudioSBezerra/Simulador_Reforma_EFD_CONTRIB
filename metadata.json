@@ -1,0 +1,5 @@
+{
+  "name": "Simulador de Reforma Tributária (IBS/CBS)",
+  "description": "Sistema avançado para análise de impactos da Reforma Tributária (2027-2033) baseado no processamento de arquivos SPED EFD Contribuições, com projeções de IBS e CBS.",
+  "requestFramePermissions": []
+}
